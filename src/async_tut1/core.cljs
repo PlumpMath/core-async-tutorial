@@ -2,7 +2,7 @@
   (:require [goog.dom :as dom]
             [goog.events :as events]
             [clojure.string :as string]
-            [cljs.core.async :refer [alts!! alts! put! chan <! timeout]])
+            [cljs.core.async :refer [tap mult alts!! alts! put! >! close! chan <! timeout]])
   (:import [goog.net Jsonp]
                       [goog Uri])
   (:require-macros [cljs.core.async.macros :refer [go]]))
@@ -80,9 +80,35 @@
       (let [[v c] (alts! cs)]
         (assert (= "hi" v))))))))
 
-(let [clicks (listen (dom/getElement "channels") "click")]
+(def to-mult (chan 1))
+(def m (mult to-mult))
+
+(let [c2 (chan 1)
+      c1 (chan 1)]
+  (tap m c1)
+  (tap m c2)
+  (go (loop []
+        (let [v (<! c2)]
+          (println "Got! " v))
+        (let [v (<! c1)]
+          (println "Got! " v)))))
+
+(put! to-mult 42)
+(put! to-mult 43)
+(close! to-mult)
+
+
+(let [clicks (listen (dom/getElement "channels") "click")
+      m (mult clicks)
+      c1 (chan)
+      c2 (chan)]
+  (tap m c1)
+  (tap m c2)
   (go (while true
-        (<! clicks)
+        (<! c1)
+        (print "c1")
+        (<! c2)
+        (print "c2")
         (create-channels (.-value (dom/getElement "num-of-channels"))))))
 
 (let [clicks (listen (dom/getElement "queries") "click")]
@@ -106,33 +132,65 @@
               (>! user-input (if (= yes c) "yes" "no"))))))))
    
 
-(defn run-audio-test [frequencies volume-start volume-step volume-max volume-min]
+(def exam {
+           :step {
+                  :prompt :correctedness
+                  :play :play_vocal
+                  }
+           :dimensions [
+                        {:type :volume
+                         :start 75
+                         :end 45
+                         :step -5
+                         }
+                        {:type :vocal
+                         :list (repeatedly 100 #(rand-nth [["Le donjon", "Le salut"]
+                                                       ["Le chateau", "Le manteau"]]))
+
+                         }]})
+
+
+(defn run-audio-test [{:keys [step dimensions] :as exam}]
+  (print exam)
   (let [user-input (chan) result-chan (chan)]
     (let [yes (listen (dom/getElement "yes") "click")
           no (listen (dom/getElement "no") "click")]
       (go (while true
             (let [[v c] (alts! [yes no])]
               (>! user-input (if (= yes c) "yes" "no"))))))
-    (go
-      (>! result-chan (loop [frequencies frequencies results {}]
-                        (if (seq frequencies)
-                          (let [f (first frequencies)
-                                result (loop [vol volume-start res {}]
-                                         (if (<= volume-min vol volume-max)
-                                           (do
-                                             (play-sound f vol)
-                                             (let [answer (<! user-input)]
-                                               (recur (next-volume answer vol volume-step)
-                                                      (assoc res vol answer))))
-                                           res))]
-                            (recur (rest frequencies) (assoc results f result)))
-                          results))))
-    result-chan))
+    (let [play (:play step)
+          play-func #(print "playing " play "at " %1 ", " %2)
+          prompt-func #(set! (.-innerHTML (dom/getElement "vocal")) %)
+          primary (first dimensions)
+          {:keys [start end step]} primary
+          primary-values (range start end step)
+          secondary (second dimensions)
+          secondary-values (:list secondary)]
+      (go
+        (>! result-chan (loop [primary-values primary-values 
+                               secondary-values secondary-values
+                               primary-res {}]
+                          (if (seq primary-values)
+                            (let [my-primary-value (first primary-values)
+                                  result (loop [my-list (first secondary-values) secondary-res {}]
+                                           (if (seq my-list)
+                                             (let [my-item (first my-list)]
+                                               (prompt-func my-item)
+                                               (play-func my-primary-value my-item)
+                                               (let [answer (<! user-input)]
+                                                 (recur (rest my-list)
+                                                        (assoc secondary-res my-item answer)))))
+                                           secondary-res)]
+                              (recur (rest primary-values)
+                                     (rest secondary-values)
+                                     (assoc primary-res my-primary-value result)))
+                            primary-res))))
+      result-chan)))
 
 (let [audio-test (listen (dom/getElement "audio-test") "click")]
   (go (while true
         (<! audio-test)
-        (println "Audio Test is done: " (<! (run-audio-test (range 3) 75 5 100 50))))))
+        (println "Audio Test is done: " (<! (run-audio-test exam))))))
 
 
 (def colors ["#FF0000"
