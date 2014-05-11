@@ -4,10 +4,33 @@
             [clojure.string :as string]
             [cljs.core.async :refer [tap mult alts!! alts! put! >! close! chan <! timeout]])
   (:import [goog.net Jsonp]
-                      [goog Uri])
+           [goog Uri])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (enable-console-print!)
+
+(defn async-data[n]
+  (let [c (chan)]
+    (go
+      (print "waiting" n)
+      (<! (timeout 2000))
+      (put! c n)
+      (print "data" n)
+      n)
+    c))
+
+
+(defn my-seq[n]
+  (lazy-seq (cons (async-data n) (my-seq (inc n)))))
+
+(def a (my-seq 0))
+
+(go 
+  (print (<! (first a)))
+  (print (<! (second a)))
+  (print (<! (first a)))
+  (print "done"))
+
 
 (def wiki-search-url
     "http://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=")
