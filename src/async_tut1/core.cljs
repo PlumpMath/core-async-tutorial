@@ -2,7 +2,8 @@
   (:require [goog.dom :as dom]
             [goog.events :as events]
             [clojure.string :as string]
-            [cljs.core.async :refer [tap mult alts!! alts! put! >! close! chan <! timeout]])
+            [clairvoyant.core :as trace :include-macros true]
+            [cljs.core.async :refer [tap mult alts! put! >! close! chan <! timeout]])
   (:import [goog.net Jsonp]
            [goog Uri])
   (:require-macros [cljs.core.async.macros :refer [go]]))
@@ -44,11 +45,19 @@
           (fn[e] (put! out (.-id element))))
     out))
 
-(defn jsonp[uri]
-  (let [out (chan)
-        req (Jsonp. (Uri. uri))]
-    (.send req nil #(put! out %))
-    out))
+(trace/trace-forms {:tracer trace/default-tracer}
+                   (defn jsonp[uri]
+                     (let [out (chan)
+                           req (Jsonp. (Uri. uri))]
+                       (.send req nil #(put! out %))
+                       out)))
+
+(trace/trace-forms {:tracer trace/default-tracer}
+                   (defn foo [a b c]
+                     (let [a 5
+                           b (+ a c)]
+                       c)))
+(foo 1 2 3)
 
 (defn render-query [results]
   (str
