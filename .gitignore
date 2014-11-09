@@ -11,3 +11,4 @@ pom.xml
 main.min.js
 *.swo
 out-prod/
+async_tut1.js
