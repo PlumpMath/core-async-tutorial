@@ -3,6 +3,8 @@
   :url "http://example.com/FIXME"
 
   :dependencies [[org.clojure/clojure "1.6.0"]
+                 [lively "0.1.2"]
+                 [viebel/audyx-toolbet "0.0.1"]
                  [org.clojure/clojurescript "0.0-2371"]
                  [spellhouse/clairvoyant "0.0-48-gf5e59d3"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]]

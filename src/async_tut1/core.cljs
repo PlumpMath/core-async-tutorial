@@ -1,6 +1,8 @@
 (ns async-tut1.core
   (:require [goog.dom :as dom]
             [goog.events :as events]
+            [audyx-toolbet.collections :as collections]
+            [lively]
             [clojure.string :as string]
             [clairvoyant.core :as trace :include-macros true]
             [cljs.core.async :refer [tap mult alts! put! >! close! chan <! timeout]])
@@ -10,7 +12,13 @@
 
 (enable-console-print!)
 
+(println "jo ")
+(lively/start "/async_tut1.js" {:polling-rate 500
+                              :on-reload    (fn [] (.log js/console "Reloaded!"))})
+
+(collections/map-object identity {:A 2})
 (defn async-data[n]
+  (print "async-data")
   (let [c (chan)]
     (go
       (print "waiting" n)
